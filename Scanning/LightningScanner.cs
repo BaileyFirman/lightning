@@ -1,8 +1,5 @@
 namespace Lightning.Scanning;
 
-using System.Linq;
-using System.Text;
-
 public class LightningScanner
 {
     public static IDictionary<string, TokenType> Keywords = new Dictionary<string, TokenType>
@@ -44,56 +41,69 @@ public class LightningScanner
         var head = source[0];
         var neck = source[1];
 
-        var (type, literal, offset) = head switch
+        var (type, lexeme, literal, offset) = head switch
         {
-            ' ' => (TokenType.Whitespace, "< >", 1),
-            '-' => (TokenType.Minus, "-", 1),
-            ',' => (TokenType.Comma, ",", 1),
-            ';' => (TokenType.Semicolon, ";", 1),
-            '!' => neck == '=' ? (TokenType.BangEqual, "!=", 2) : (TokenType.Bang, "!", 1),
-            '.' => (TokenType.Dot, ".", 1),
-            '(' => (TokenType.LeftParen, "(", 1),
-            ')' => (TokenType.RightParen, ")", 1),
-            '{' => (TokenType.LeftBrace, "{", 1),
-            '}' => (TokenType.RightBrace, "}", 1),
-            '*' => (TokenType.Star, "*", 1),
-            '/' => (TokenType.Slash, "/", 1),
+            ' ' => (TokenType.Whitespace, "< >", null, 1),
+            '-' => (TokenType.Minus, "-", null, 1),
+            ',' => (TokenType.Comma, ",", null, 1),
+            ';' => (TokenType.Semicolon, ";", null, 1),
+            '!'
+                => neck == '='
+                    ? (TokenType.BangEqual, "!=", null, 2)
+                    : (TokenType.Bang, "!", null, 1),
+            '.' => (TokenType.Dot, ".", null, 1),
+            '(' => (TokenType.LeftParen, "(", null, 1),
+            ')' => (TokenType.RightParen, ")", null, 1),
+            '{' => (TokenType.LeftBrace, "{", null, 1),
+            '}' => (TokenType.RightBrace, "}", null, 1),
+            '*' => (TokenType.Star, "*", null, 1),
+            '/' => (TokenType.Slash, "/", null, 1),
             '\"' => StringToken(source),
-            '\0' => (TokenType.Eof, "EOF", 1),
-            '\n' => (TokenType.Newline, "<\\n>", 1),
-            '\r' => (TokenType.Whitespace, "<\\r>", 1),
-            '\t' => (TokenType.Whitespace, "<\\t>", 1),
-            '+' => (TokenType.Plus, "+", 1),
-            '<' => neck == '=' ? (TokenType.LessEqual, "<=", 2) : (TokenType.Less, "<", 1),
-            '=' => neck == '=' ? (TokenType.EqualEqual, "==", 2) : (TokenType.Bang, "=", 1),
-            '>' => neck == '=' ? (TokenType.GreaterEqual, ">=", 2) : (TokenType.Greater, ">", 1),
+            '\0' => (TokenType.Eof, "EOF", null, 1),
+            '\n' => (TokenType.Newline, "<\\n>", null, 1),
+            '\r' => (TokenType.Whitespace, "<\\r>", null, 1),
+            '\t' => (TokenType.Whitespace, "<\\t>", null, 1),
+            '+' => (TokenType.Plus, "+", null, 1),
+            '<'
+                => neck == '='
+                    ? (TokenType.LessEqual, "<=", null, 2)
+                    : (TokenType.Less, "<", null, 1),
+            '='
+                => neck == '='
+                    ? (TokenType.EqualEqual, "==", null, 2)
+                    : (TokenType.Bang, "=", null, 1),
+            '>'
+                => neck == '='
+                    ? (TokenType.GreaterEqual, ">=", null, 2)
+                    : (TokenType.Greater, ">", null, 1),
             _ when char.IsDigit(head) => NumberToken(source),
-            _ => (TokenType.Error, "Unknown LightningScanner error", 1),
+            _ => (TokenType.Error, "Unknown LightningScanner error", null, 1),
         };
 
-        var token = new Token(type, literal, literal, line);
+        tokens.Add(new Token(type, lexeme, literal, line));
 
         switch (type)
         {
             case TokenType.Eof:
-                tokens.Add(token);
+                break;
+            case TokenType.Newline:
+                ScanToken(tokens, source[offset..], line + 1);
                 break;
             default:
-                tokens.Add(token);
-                ScanToken(tokens, source[offset..], line + 1);
+                ScanToken(tokens, source[offset..], line);
                 break;
         }
     }
 
-    private (TokenType, string, int) StringToken(ReadOnlySpan<char> source)
+    private (TokenType, string, object, int) StringToken(ReadOnlySpan<char> source)
     {
         var end = source[1..].IndexOf('"') + 1;
         var value = source[1..end].ToString();
 
-        return (TokenType.String, value, value.Length + 2);
+        return (TokenType.String, value, value, value.Length + 2);
     }
 
-    private (TokenType, string, int) NumberToken(ReadOnlySpan<char> source)
+    private (TokenType, string, object, int) NumberToken(ReadOnlySpan<char> source)
     {
         var result = 0;
         var isFloating = false;
@@ -121,7 +131,8 @@ public class LightningScanner
 
         var numberLiteral = new string(source[0..result]);
         var numberType = isFloating ? TokenType.NumberFloat : TokenType.NumberFixed;
+        var number = isFloating ? float.Parse(numberLiteral) : int.Parse(numberLiteral);
 
-        return (numberType, numberLiteral, numberLiteral.Length);
+        return (numberType, numberLiteral, number, numberLiteral.Length);
     }
 }
