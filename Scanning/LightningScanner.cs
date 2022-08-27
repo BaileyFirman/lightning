@@ -1,5 +1,8 @@
 namespace Lightning.Scanning;
 
+using System.Linq;
+using System.Text;
+
 public class LightningScanner
 {
     public static IDictionary<string, TokenType> Keywords = new Dictionary<string, TokenType>
@@ -64,6 +67,7 @@ public class LightningScanner
             '<' => neck == '=' ? (TokenType.LessEqual, "<=", 2) : (TokenType.Less, "<", 1),
             '=' => neck == '=' ? (TokenType.EqualEqual, "==", 2) : (TokenType.Bang, "=", 1),
             '>' => neck == '=' ? (TokenType.GreaterEqual, ">=", 2) : (TokenType.Greater, ">", 1),
+            _ when char.IsDigit(head) => NumberToken(source),
             _ => (TokenType.Error, "Unknown LightningScanner error", 1),
         };
 
@@ -87,5 +91,37 @@ public class LightningScanner
         var value = source[1..end].ToString();
 
         return (TokenType.String, value, value.Length + 2);
+    }
+
+    private (TokenType, string, int) NumberToken(ReadOnlySpan<char> source)
+    {
+        var result = 0;
+        var isFloating = false;
+
+        foreach (var c in source)
+        {
+            if (char.IsDigit(c))
+            {
+                result++;
+            }
+            else if (c == '.')
+            {
+                result++;
+                if (isFloating)
+                {
+                    break;
+                }
+                isFloating = true;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        var numberLiteral = new string(source[0..result]);
+        var numberType = isFloating ? TokenType.NumberFloat : TokenType.NumberFixed;
+
+        return (numberType, numberLiteral, numberLiteral.Length);
     }
 }
